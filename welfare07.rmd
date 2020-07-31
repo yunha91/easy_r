@@ -1,0 +1,83 @@
+---
+title: "제목"
+author: 작성자
+date: July 30, 2020
+output: github_document
+---
+
+```{r, include=F}
+library(foreign)             # SPSS 파일 로드
+library(dplyr)               # 전처리
+library(ggplot2)             # 시각화
+library(readxl)              # 엑셀 파일 불러오기
+
+# 데이터 불러오기
+raw_welfare <- read.spss(file = "Koweps_hpc10_2015_beta1.sav",
+                         to.data.frame = T)
+
+# 복사본 만들기
+welfare <- raw_welfare
+
+# 변수 이름 변경하기기
+welfare <- rename(welfare,
+                  sex = h10_g3,            # 성별
+                  birth = h10_g4,          # 태어난 연도
+                  marriage = h10_g10,      # 혼인 상태
+                  religion = h10_g11,      # 종교
+                  income = p1002_8aq1,     # 월급
+                  code_job = h10_eco9,     # 직종 코드
+                  code_region = h10_reg7)  # 지역 코드
+welfare$age<-2015-welfare$birth + 1
+welfare$sex <- ifelse(welfare$sex == 1, "male", "female")
+welfare <- welfare %>%
+  mutate(age_group = ifelse(age <30, "young", ifelse(age <=59, "middle", "old")))
+class(welfare$code_job)
+library(readxl)
+list_job <- read_excel("Koweps_Codebook.xlsx", col_names=T, sheet=2)
+welfare <- left_join(welfare, list_job, id="code_job")
+```
+
+## 7. 성별 직업 빈도
+
+특정 직업은 여성 또는 남성의 비율이 확연하게 차이납니다. 이번에는 성별 직업 빈도를 분석하여 어떤 직업군에 특정 성별이 많은지 분석해보도록 하겠습니다. 
+
+### 분석 절차
+
+* 사용할 데이터를 검토하여 분석에 용이하도록 전처리합니다. 
+* 성별 직업 빈도표를 작성합니다. 
+* 빈도표를 기준으로 그래프를 작성합니다. 
+
+### 성별 직업 빈도 분석하기
+
+#### 1. 성별 직업 빈도표 만들기
+
+여성과 남성으로 구분하여 직업으로 group_by 하여 빈도표를 2개 생성합니다. 
+
+```{r}
+f_job <- welfare %>% 
+  filter(!is.na(job) & sex == "male") %>% 
+  group_by(job) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count)) %>% 
+  head(10)
+m_job <- welfare %>% 
+  filter(!is.na(job) & sex == "female") %>% 
+  group_by(job) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count)) %>% 
+  head(10)
+```
+
+#### 2. 그래프 만들기
+
+```{r, results="hide"}
+ggplot(data=f_job, aes(x=reorder(job, count), y=count))+
+  geom_col() +
+  coord_flip()
+```
+
+```{r, results="hide"}
+ggplot(data=m_job, aes(x=reorder(job, count), y=count))+
+  geom_col() +
+  coord_flip()
+```
